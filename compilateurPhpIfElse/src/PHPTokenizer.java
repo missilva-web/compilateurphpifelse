@@ -14,20 +14,26 @@ public class PHPTokenizer {
         List<Token> tokens = new ArrayList<>();
         int pos = 0;
 
-        while (pos < input.length()) {
-            char c = input.charAt(pos);
+        while (true) {
+            char c;
+            try {
+                c = input.charAt(pos);
+            } catch (StringIndexOutOfBoundsException e) {
+                break;
+            }
 
             if (Character.isWhitespace(c)) { 
                 pos++; 
                 continue; 
             }
 
-           
-            if (c == '/') {
-                if (pos + 1 < input.length() && input.charAt(pos + 1) == '/') {
+            try {
+                if (c == '/' && input.charAt(pos + 1) == '/') {
                     pos = skipLineComment(input, pos); 
                     continue;
                 }
+            } catch (StringIndexOutOfBoundsException e) {
+                // pas de commentaire
             }
 
             if (c == '"' || c == '\'') { 
@@ -72,35 +78,61 @@ public class PHPTokenizer {
 
     private int skipLineComment(String input, int start) {
         int i = start + 2;
-        while (i < input.length() && input.charAt(i) != '\n') i++;
-        return i;
+        while (true) {
+            try {
+                if (input.charAt(i) == '\n') return i;
+                i++;
+            } catch (StringIndexOutOfBoundsException e) {
+                return i;
+            }
+        }
     }
 
     private int parseString(String input, int start, List<Token> tokens) {
         char quote = input.charAt(start);
         int i = start + 1;
-        while (i < input.length()) {
-            if (input.charAt(i) == '\\') { i += 2; continue; }
-            if (input.charAt(i) == quote) {
-                tokens.add(new Token("STRING", input.substring(start, i + 1)));
-                return i + 1;
+        while (true) {
+            try {
+                if (input.charAt(i) == '\\') { 
+                    i += 2; 
+                    continue; 
+                }
+                if (input.charAt(i) == quote) {
+                    tokens.add(new Token("STRING", input.substring(start, i + 1)));
+                    return i + 1;
+                }
+                i++;
+            } catch (StringIndexOutOfBoundsException e) {
+                tokens.add(new Token("ERROR", "Unclosed string"));
+                return i;
             }
-            i++;
         }
-        tokens.add(new Token("ERROR", "Unclosed string"));
-        return input.length();
     }
 
     private int parseNumber(String input, int start, List<Token> tokens) {
         int i = start + 1;
-        while (i < input.length() && (Character.isDigit(input.charAt(i)) || input.charAt(i) == '.')) i++;
+        while (true) {
+            try {
+                if (!Character.isDigit(input.charAt(i)) && input.charAt(i) != '.') break;
+                i++;
+            } catch (StringIndexOutOfBoundsException e) {
+                break;
+            }
+        }
         tokens.add(new Token("NUMBER", input.substring(start, i)));
         return i;
     }
 
     private int parseIdentifier(String input, int start, List<Token> tokens) {
         int i = start + 1;
-        while (i < input.length() && (Character.isLetterOrDigit(input.charAt(i)) || input.charAt(i) == '_')) i++;
+        while (true) {
+            try {
+                if (!Character.isLetterOrDigit(input.charAt(i)) && input.charAt(i) != '_') break;
+                i++;
+            } catch (StringIndexOutOfBoundsException e) {
+                break;
+            }
+        }
         String word = input.substring(start, i);
         tokens.add(classifyToken(word));
         return i;
@@ -108,7 +140,11 @@ public class PHPTokenizer {
 
     private int matchOperator(String input, int pos) {
         for (String op : MULTI_OPS) {
-            if (input.startsWith(op, pos)) return op.length();
+            try {
+                if (input.startsWith(op, pos)) return op.length();
+            } catch (StringIndexOutOfBoundsException e) {
+                // op trop long
+            }
         }
         return 0;
     }
