@@ -2,13 +2,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
-
 /**
- *
+ * PHP If/Else Parser avec support else if, if imbriqués et ++/--
  * @author ALEM
  */
 public class PHPIfElseParser {
@@ -18,7 +13,6 @@ public class PHPIfElseParser {
     private final List<String> errors = new ArrayList<>();
     
     public PHPIfElseParser(PHPTokenizer tokenizer, String code) {
-        // ✅ Compatible VOTRE tokenizer
         this.tokens = tokenizer.tokenize(code);
     }
     
@@ -62,20 +56,16 @@ public class PHPIfElseParser {
         skipWhitespaceTokens();
         if (safePeekType().equals("KEYWORD") && safePeekValue().equals("else")) {
             safeConsume("KEYWORD", "else");
-            
-            // ✅ VÉRIFICATION { OBLIGATOIRE APRÈS ELSE
             skipWhitespaceTokens();
-            if (currentTokenIndex >= tokens.size()) {
-                addError("Attendu DELIMITER [{] après else, trouvé EOF");
-                return;
-            }
-            if (!safePeekValue().equals("{")) {
-                addError("Attendu DELIMITER [{] après else, trouvé " + safePeekType() + " '" + safePeekValue() + "'");
-                safeSkipToken();
-                return;
-            }
             
-            parseStatementRecover();  // { ... }
+            // ✅ Support else if imbriqué
+            if (safePeekType().equals("KEYWORD") && safePeekValue().equals("if")) {
+                parseIfStatementRecover();  // Récursion pour else if
+            } else if (safePeekValue().equals("{")) {
+                parseStatementRecover();  // Bloc { ... }
+            } else {
+                parseStatementRecover();  // simple statement
+            }
         }
     }
     
@@ -109,7 +99,6 @@ public class PHPIfElseParser {
         skipWhitespaceTokens();
         if (safePeekType().equals("OPERATOR") && isComparisonOperator(safePeekValue())) {
             safeConsume("OPERATOR");
-            // ✅ CORRECTION : true/false KEYWORD acceptés !
             safeConsumeAny("NUMBER", "STRING", "VARIABLE", "KEYWORD");
         }
     }
@@ -128,7 +117,12 @@ public class PHPIfElseParser {
     private void parseBlockRecover() {
         safeConsume("DELIMITER", "{");
         while (currentTokenIndex < tokens.size() && !safePeekValue().equals("}")) {
-            parseSimpleStatementRecover();
+            // ✅ Support if imbriqué dans blocs
+            if (safePeekType().equals("KEYWORD") && safePeekValue().equals("if")) {
+                parseIfStatementRecover();
+            } else {
+                parseSimpleStatementRecover();
+            }
         }
         safeConsume("DELIMITER", "}");
     }
@@ -187,12 +181,15 @@ public class PHPIfElseParser {
             return;
         }
         
-        // $var = 42, $x++, etc
+        // $var = 42, $x++, $x-- terminent l'expression
         if (safePeekType().equals("VARIABLE")) {
             safeConsume("VARIABLE");
             if (safePeekType().equals("OPERATOR") && 
-                (isAssignmentOperator(safePeekValue()) || 
-                 safePeekValue().equals("++") || safePeekValue().equals("--"))) {
+                (safePeekValue().equals("++") || safePeekValue().equals("--"))) {
+                safeConsume("OPERATOR");
+                return;  // ✅ TERMINÉ après ++/--
+            }
+            if (safePeekType().equals("OPERATOR") && isAssignmentOperator(safePeekValue())) {
                 safeConsume("OPERATOR");
                 safeConsumeAny("NUMBER", "VARIABLE", "STRING");
             }
